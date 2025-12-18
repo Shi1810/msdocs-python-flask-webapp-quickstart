@@ -1,15 +1,54 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+# Azure DevOps pipeline for deploying a Python app to Azure App Service (Linux)
+# Save as azure-pipelines.yml in your repo root
 
-# This is an example starter azure.yaml file containing several example services in comments below.
-# Make changes as needed to describe your application setup.
-# To learn more about the azure.yaml file, visit https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/azd-schema
+trigger:
+  branches:
+    include:
+      - main  # Change to your main branch
 
-# Name of the application.
-name: msdocs-python-flask-webapp-quickstart
-metadata:
-  template: msdocs-python-flask-webapp-quickstart@0.0.1-beta
-services:
-  web:
-    project: .
-    language: python
-    host: appservice
+variables:
+  # Set these variables or override in Pipeline UI
+  azureSubscription: 'ShikhaAzureConnection'
+  appName: 'pythonappsample'
+  resourceGroupName: 'shikhajhatestingrg'
+  pythonVersion: '3.13' # Change as needed
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '$(pythonVersion)'
+    addToPath: true
+
+- script: |
+    python -m pip install --upgrade pip
+    pip install -r requirements.txt
+  displayName: 'Install dependencies'
+
+- script: |
+    python -m pytest
+  displayName: 'Run tests'
+  # Remove if not using pytest
+
+- task: ArchiveFiles@2
+  inputs:
+    rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/app.zip'
+    replaceExistingArchive: true
+
+- publish: '$(Build.ArtifactStagingDirectory)/app.zip'
+  artifact: drop
+
+- task: AzureWebApp@1
+  displayName: 'Deploy to Azure Web App'
+  inputs:
+    azureSubscription: '$(azureSubscription)'
+    appType: 'webAppLinux'
+    appName: '$(appName)'
+    package: '$(Build.ArtifactStagingDirectory)/app.zip'
+
